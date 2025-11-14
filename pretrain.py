@@ -7,9 +7,9 @@ def load_KG(path):
     return KG
 
 def main():
-    KG_path = './pyG_graph_data/knowledge_graph_patients.pt'
+    KG_path = '../pyG_graph_data/knowledge_graph_patients.pt'
     KG = load_KG(KG_path)
-    print(KG['x'])
+    print(KG.keys())
 
 if __name__ == "__main__":
     main()
