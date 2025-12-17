@@ -21,6 +21,9 @@ def save_graph(graph, nids, node_label_to_type, edge_label_to_type, fastrp, node
     def save_parquet(df, file_name):
         df.to_parquet(path=file_name)
 
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
     torch.save(graph, os.path.join(path, 'knowledge_graph_patients.pt'))
     torch.save(nids, os.path.join(path, 'neo4j_ids.pt'))
     save_json(node_label_to_type, os.path.join(path, 'node_label_to_type.json'))
