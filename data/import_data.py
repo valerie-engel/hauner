@@ -6,25 +6,35 @@ import json
 from torch_geometric.utils import to_undirected, subgraph
 from torch_geometric.data import Data
 
-
-def load_graph(path, device='cpu', undirected=False, embedding=None, drop_labels=None):
+# disentangling load_graph and load_patients is slightly slower, but more flexible... extra fct. that does both?
+def import_patients(path, device='cpu'):
     file_name = os.path.join(path, 'knowledge_graph_patients.pt')
-    print(f"Loading Knowledge graph from {os.path.abspath(file_name)}")
+    graph = load_graph(file_name, device)
+    # represent each biological sample as set of their neighbours in KG... as pyg Data?
     
-    graph = torch.load(file_name, weights_only=False, map_location=device)
-    print("Done!\n")
+
+def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None, drop_labels=None):
+    file_name = os.path.join(path, 'knowledge_graph_patients.pt')
+    KG = load_graph(file_name, device)
 
     if embedding:
-        graph['x'] = load_embedding(embedding_type=embedding, num_nodes=graph.num_nodes, path=path)
+        KG['x'] = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path)
 
     if drop_labels:
-        graph, full_graph_ids = drop_nodes_by_label(graph, drop_labels, path)
+        KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path)
 
     if undirected:
         print("Making graph undirected")
-        graph.edge_index = to_undirected(graph.edge_index)
+        KG.edge_index = to_undirected(KG.edge_index)
 
-    return graph, full_graph_ids
+    return KG #, full_graph_ids
+
+
+def load_graph(file_name, device='cpu'):
+    print(f"Loading data from {os.path.abspath(file_name)}")
+    graph = torch.load(file_name, weights_only=False, map_location=device)
+    print("Done!\n")
+    return graph 
 
 
 def load_embedding(embedding_type, num_nodes, path):
