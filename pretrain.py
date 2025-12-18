@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from torch_geometric.loader import LinkNeighborLoader
 
-from data.utils import load_graph
+from data.load_graph import load_graph
 import cfg
 from models import LinkPredictor
 
