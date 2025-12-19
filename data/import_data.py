@@ -94,7 +94,7 @@ def filter_graph_by_nodes(graph, keep_nodes):
     )
 
     # number of subgraph nodes
-    num_nodes = sum(keep_nodes) if keep_nodes.dtype == torch.bool else len(keep_nodes)
+    num_nodes = int(sum(keep_nodes)) if keep_nodes.dtype == torch.bool else len(keep_nodes)
     
     # create a new Data object, filtering all keys with values of length num_nodes or num_edges
     subgraph_dict = {'edge_index': edge_index, 'num_nodes': num_nodes, 'edge_label': edge_label}

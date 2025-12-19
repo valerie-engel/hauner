@@ -134,13 +134,28 @@ def build_graph_from_df(nodes, edges):
 
 #     return build_graph_from_df(nodes, edges)
 
+def tiny_graph(out_dir): #num_nodes, 
+    edge_index = torch.tensor([[0,1,0,2],[1,0,2,1]])
+    y = torch.tensor([1,0,1])
+    edge_label = torch.tensor([0,1,1,0])
+    num_nodes = len(y)
+    graph = Data(y=y, edge_index=edge_index, edge_label=edge_label, num_nodes=num_nodes)
+    nids = torch.tensor([0,2,3])
+    node_label_to_type = {0: "[\"Biological_process\"]", 1: "[\"Subject\"]"}
+    edge_label_to_type = {0: "IS_SUBUNIT_OF", 1: "HAS_PARENT"}
+    fastrp = pd.DataFrame({"pyg_id": [], "embedding": torch.tensor([])})
+    node2vec = pd.DataFrame({"pyg_id": [], "embedding": torch.tensor([])})
+    save_graph(graph, nids, node_label_to_type, edge_label_to_type, fastrp, node2vec, os.path.join(out_dir))
+    return graph
+
 
 def build_full_graph(parquet_dir):
     nodes, edges = load_all_parquet_files(parquet_dir)
     return build_graph_from_df(nodes, edges)
 
-parquet_dir = "/home/vagrant/dev/variant_ranking/parquet_export"
-out_dir = "data/knowledge_graph"
-graph, pyg_to_nid, node_label_to_type, edge_label_to_type, fastrp, node2vec = build_full_graph(parquet_dir)
+tiny_graph("data/tiny_knowledge_graph")
+# parquet_dir = "/home/vagrant/dev/variant_ranking/parquet_export"
+# out_dir = "data/knowledge_graph"
+# graph, pyg_to_nid, node_label_to_type, edge_label_to_type, fastrp, node2vec = build_full_graph(parquet_dir)
 
 
