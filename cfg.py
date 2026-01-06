@@ -6,4 +6,5 @@ tiny_KG_path = 'data/tiny_knowledge_graph'
 
 in_channels = 8
 hidden_channels = 8
-num_layers = 1
+n_layers = 1
+n_heads = 1
