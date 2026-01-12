@@ -77,6 +77,9 @@ class LinkPredictor(pl.LightningModule):
         dst_index = torch.cat((dst_pos_index, dst_neg_index))
         logits = self(edge_index, src_index, dst_index)
         loss = self.loss_fn(logits_pos=logits[:num_pos], logits_neg=logits[num_pos:]) 
+
+        self.log("train_loss", loss, on_epoch=True)
+
         return loss
     
     def configure_optimizers(self):
