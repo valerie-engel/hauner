@@ -13,15 +13,17 @@ def import_patients(path, device='cpu'):
     # represent each biological sample as set of their neighbours in KG... as pyg Data?
     
 
-def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None, drop_labels=None):
+def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None, drop_labels=None, drop_unembedded=False):
     file_name = os.path.join(path, 'knowledge_graph_patients.pt')
     KG = load_graph(file_name, device)
 
     if embedding:
-        KG['x'] = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path)
+        KG['x'], ids_with_embedding = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path, device=device)
+        if drop_unembedded:
+            KG = filter_graph_by_nodes(KG, keep_nodes=ids_with_embedding)
 
     if drop_labels:
-        KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path)
+        KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path, device)
 
     if undirected:
         print("Making graph undirected")
@@ -37,7 +39,7 @@ def load_graph(file_name, device='cpu'):
     return graph 
 
 
-def load_embedding(embedding_type, num_nodes, path):
+def load_embedding(embedding_type, num_nodes, path, device='cpu'):
     assert embedding_type in ['fastrp', 'node2vec'], f"{embedding_type} is not available as node embedding"
     
     print(f"Loading {embedding} node embeddings...")
@@ -45,21 +47,23 @@ def load_embedding(embedding_type, num_nodes, path):
     file_extension = '.parquet'
     file_name = os.path.join(path, embedding_type + file_extension)
     df = pd.read_parquet(file_name)
-    available_embeddings = torch.tensor(list(df['embedding'])).float()
+    available_embeddings = torch.tensor(list(df['embedding'])).float().to(device=device)
+    ids_with_embedding = torch.tensor(df['pyg_id']).to(device=device)
+
     emb_size = available_embeddings.shape[1:] 
     embedding = torch.full((num_nodes, *emb_size), float('nan'))
-    embedding[df['pyg_id']] = available_embeddings 
+    embedding[ids_with_embedding] = available_embeddings 
 
     print("Done!\n")
 
-    return embedding
+    return embedding, ids_with_embedding
 
 
 ## more elegant to do this from parquet files...? Or directly when downloading? yeah, but this works for us...
-def drop_nodes_by_label(graph, drop_labels, path):
+def drop_nodes_by_label(graph, drop_labels, path, device='cpu', drop_unembedded=False):
     print(f"Dropping all nodes of labels {drop_labels}")
 
-    drop_types = map_labels_to_types(drop_labels, path)
+    drop_types = map_labels_to_types(drop_labels, path, device)
     keep_nodes_mask = ~(torch.isin(graph.y, drop_types))
     subgraph = filter_graph_by_nodes(graph, keep_nodes_mask)
     full_graph_ids = torch.nonzero(keep_nodes_mask)
@@ -68,7 +72,7 @@ def drop_nodes_by_label(graph, drop_labels, path):
     return subgraph, full_graph_ids
 
     
-def map_labels_to_types(labels, path):
+def map_labels_to_types(labels, path, device):
     # adapt to new filename, save dict other way around and saving without [\\]
     with open(os.path.join(path, 'node_labels.json')) as f:
         types_to_labels = json.load(f) 
@@ -80,7 +84,7 @@ def map_labels_to_types(labels, path):
             types.append(eval(t))
 
     assert len(types) == len(labels), f"Not all labels in {labels} could be translated to types. Please check spelling"
-    return torch.tensor(types)
+    return torch.tensor(types).to(device=device)
 
 
 def filter_graph_by_nodes(graph, keep_nodes):
@@ -110,4 +114,4 @@ def filter_graph_by_nodes(graph, keep_nodes):
                 print(f"Not filtering {key}")
                 subgraph_dict[key] = value
     
-    return Data(**subgraph_dict)
+    return Data(**subgraph_dict)    # on correct device?
