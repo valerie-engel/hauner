@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:b200:1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32GB
-#SBATCH --time=01:30:00
+#SBATCH --time=02:00:00
 #SBATCH --account=core-kind
 #SBATCH -o logs/build_container%j.log
 #SBATCH -e logs/build_container%j.err
@@ -13,8 +13,8 @@
 
 #### Adapt variables here ####
 
-IMAGE_PATH="./nightly.sif" # could also be something like IMAGE_PATH=/data/core-xxx/containers/...
-DEFINITION_FILE_PATH="./nightly.def"
+IMAGE_PATH="./container_pyg.sif" # could also be something like IMAGE_PATH=/data/core-xxx/containers/...
+DEFINITION_FILE_PATH="./container_pyg.def"
 
 #### End definitions ####
 

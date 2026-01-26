@@ -21,6 +21,9 @@ def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None,
         KG['x'], ids_with_embedding = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path, device=device)
         if drop_unembedded:
             KG = filter_graph_by_nodes(KG, keep_nodes=ids_with_embedding)
+            types = KG.y.unique()
+            labels = map_labels_to_types(types)
+            print(f"Found {KG.num_nodes} nodes with {embedding} embedding. Remaining node labels: {labels}")
 
     if drop_labels:
         KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path, device)
@@ -69,22 +72,8 @@ def drop_nodes_by_label(graph, drop_labels, path, device='cpu', drop_unembedded=
     full_graph_ids = torch.nonzero(keep_nodes_mask)
     # if not cfg.debug:
     #     torch.save(torch.where(keep_nodes_mask), os.path.join(path, )) ## SAVE SOMEWHERE IN RUN RESULTS...
+    print(f"Remaining: {subgraph.num_nodes} nodes and {subgraph.num_edges} edges\n")
     return subgraph, full_graph_ids
-
-    
-def map_labels_to_types(labels, path, device):
-    # adapt to new filename, save dict other way around and saving without [\\]
-    with open(os.path.join(path, 'node_labels.json')) as f:
-        types_to_labels = json.load(f) 
-
-    types = []
-    for t, label in types_to_labels.items():
-        label = eval(label)[0]  # to strip string of [\\]
-        if label in labels:
-            types.append(eval(t))
-
-    assert len(types) == len(labels), f"Not all labels in {labels} could be translated to types. Please check spelling"
-    return torch.tensor(types).to(device=device)
 
 
 def filter_graph_by_nodes(graph, keep_nodes):
@@ -114,4 +103,38 @@ def filter_graph_by_nodes(graph, keep_nodes):
                 print(f"Not filtering {key}")
                 subgraph_dict[key] = value
     
+    ## adapt node labels to consecutive???
     return Data(**subgraph_dict)    # on correct device?
+
+
+def map_labels_to_types(labels, path, device):
+    # adapt to new filename, save dict other way around and saving without [\\]
+    with open(os.path.join(path, 'node_labels.json')) as f:
+        types_to_labels = json.load(f) 
+
+    types = []
+    for t, label in types_to_labels.items():
+        label = eval(label)[0]  # to strip string of [\\]
+        if label in labels:
+            types.append(eval(t))
+
+    assert len(types) == len(labels), f"Not all labels in {labels} could be translated to types. Please check spelling"
+    return torch.tensor(types).to(device=device)
+
+
+def map_types_to_labels(types, path):
+    with open(os.path.join(path, 'node_labels.json')) as f:
+        types_to_labels = json.load(f) 
+    types = types.to(device='cpu')
+    labels = [types_to_labels[str(int(t))] for t in types]
+    return types_to_labels
+
+
+def get_neo4j_id(ids, neo4j_ids=None, full_graph_ids=None):
+    if full_graph_ids:
+        ids = full_graph_ids[ids]
+
+    if neo4j_ids is None:
+        neo4j_ids = torch.load(os.path.join(cfg.path, 'neo4j_ids.pt'))
+        
+    return neo4j_ids[ids]
