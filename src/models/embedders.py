@@ -1,71 +1,9 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import torch_geometric as pyg
-# import BatchNorm, LayerNorm, GATv2Conv
-
-# class GAT(pl.LightningModule):
-#     def __init__(self, config):
-#         super().__init__()
-#         self.gat = nn.models.GAT(config.in_channels, config.hidden_channels, config.num_layers, norm=nn.LayerNorm)
-
-class GAT_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, n_heads, dropout, residual):
-        super().__init__()
-        self.gat = pyg.nn.GATv2Conv(in_channels=in_channels, out_channels=out_channels, heads=n_heads, dropout=dropout, residual=residual)
-        self.ln = pyg.nn.LayerNorm(out_channels * n_heads)
-
-    def forward(self, x, edge_index):
-        assert x.dim() == 2
-        assert edge_index.dim() == 2
-        assert edge_index.size(0) == 2
-        assert edge_index.dtype == torch.long
-        assert edge_index.min() >= 0
-        assert edge_index.max() < x.size(0)
-        assert torch.isfinite(x).all()
-        
-        # print(f"device x: {x.get_device()}")
-        # print(f"device edge_index: {edge_index.get_device()}")
-        x = self.gat(x, edge_index)
-        x = self.ln(x)
-        return x
-
-class GAT(pl.LightningModule):
-    def __init__(self, n_layers, in_channels, hidden_channels, out_channels,n_heads, dropout, residual):
-        super().__init__()
-        self.n_layers = n_layers
-        self.in_layer = GAT_layer(
-            in_channels=in_channels, 
-            out_channels=hidden_channels, # if I only had 1 layer this should prob. be out_channels
-            n_heads=n_heads, 
-            dropout=dropout, 
-            residual=residual
-            )
-        self.layers = nn.ModuleList([GAT_layer(
-            in_channels=hidden_channels * n_heads, 
-            out_channels=hidden_channels, 
-            n_heads=n_heads, 
-            dropout=dropout, 
-            residual=residual
-            ) for _ in range(n_layers - 2)])
-        if self.n_layers > 1:
-            self.out_layer = GAT_layer(
-            in_channels=hidden_channels * n_heads, 
-            out_channels=out_channels, 
-            n_heads=n_heads, 
-            dropout=dropout, 
-            residual=residual
-            )
-
-    def forward(self, x, edge_index):
-        x = self.in_layer(x, edge_index)
-        if self.n_layers > 1:
-            for layer in self.layers:
-                x = layer(x, edge_index)
-            x = self.out_layer(x, edge_index)
-        return x
+from base_models import GAT
 
 class MaxMarginLoss(nn.Module):
     def __init__(self, margin=1):
@@ -75,22 +13,6 @@ class MaxMarginLoss(nn.Module):
     def forward(self, logits_pos, logits_neg):
         loss = torch.clamp(self.margin - logits_pos + logits_neg, min=0.0)
         return loss.mean() 
-
-
-class TypeEmbedder(nn.Module):
-    def __init__(self, num_types, channels, existing_embedding=None):
-        super().__init__()
-        self.type_embedding = nn.Embedding(num_types, channels)
-        self.existing_embedding = existing_embedding
-
-    def forward(self, types, x=None):
-        assert (self.existing_embedding is None) == (x is None), f"This model expects precomputed {self.existing_embedding} embeddings. Please pass them for correct computation."
-
-        type_embedding = self.type_embedding(types)
-        if self.existing_embedding:
-            return x + type_embedding
-        else:
-            return type_embedding
 
 
 class LinkPredictor(pl.LightningModule):

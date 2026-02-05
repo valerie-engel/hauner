@@ -6,7 +6,7 @@ from pytorch_lightning import Trainer
 from torch_geometric.loader import LinkNeighborLoader
 from pytorch_lightning.loggers import CSVLogger
 
-from data import import_knowledge_graph
+from data.importing import import_knowledge_graph
 from plotting import plot_loss
 import configs.cfg_pretrain as cfg
 import utils

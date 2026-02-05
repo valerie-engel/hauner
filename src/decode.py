@@ -6,7 +6,7 @@ import torch
 # from torch_geometric.loader import LinkNeighborLoader
 # from pytorch_lightning.loggers import CSVLogger
 
-from data import import_patients
+from data.importing import import_patients
 # from plotting import plot_loss
 import configs.cfg_decode as cfg
 # import utils
