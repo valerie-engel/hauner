@@ -10,13 +10,21 @@ from data import import_knowledge_graph
 from plotting import plot_loss
 import cfg
 import utils
-from models import LinkPredictor
+from models.embedders import LinkPredictor
 
 
 pl.seed_everything(42)
 accelerator = 'gpu' if torch.cuda.is_available() else 'cpu' #, graph_device = utils.get_devices(cfg.num_gpu)
 
-KG = import_knowledge_graph(path=cfg.KG_path, drop_labels=cfg.drop_labels, device='cpu') #graph_device
+KG, _ = import_knowledge_graph(
+    path=cfg.KG_path, 
+    device='cpu', 
+    undirected=cfg.undirected, 
+    embedding=cfg.embedding, 
+    drop_labels=cfg.drop_labels, 
+    drop_unembedded=cfg.drop_unembedded
+    ) #graph_device
+print(f'KG.x exists: {KG.x is not None}')
 
 train_loader = LinkNeighborLoader(
     KG, 
@@ -29,16 +37,17 @@ train_loader = LinkNeighborLoader(
 train_loader.num_neighbors = [cfg.num_sampled_neighbors] * cfg.n_layers
 # sampled_data = next(iter(train_loader))
 
-# print(sampled_data)
-vocab_size = int(KG.y.max()) + 1 #THIS LEAVES DEAD PARAMETERS #len(KG.y.unique())    # embed by node type
+num_node_types = len(KG.y.unique()) 
+in_channels = cfg.in_channels if KG.x is None else KG.x.shape[-1]
 model = LinkPredictor(
-    vocab_size=vocab_size, 
+    num_types=num_node_types, 
     n_layers=cfg.n_layers, 
-    in_channels=cfg.in_channels, 
+    in_channels=in_channels, 
     hidden_channels=cfg.hidden_channels, 
     out_channels=cfg.out_channels, 
     n_heads=cfg.n_heads, 
     dropout=cfg.dropout, 
+    existing_embedding=cfg.embedding,
     residual=cfg.residual, 
     margin=cfg.margin
     )
@@ -51,7 +60,7 @@ trainer = Trainer(
     devices=torch.cuda.device_count(), 
     strategy="ddp", 
     max_epochs=cfg.max_epochs, 
-    precision=32, # "16-mixed"
+    precision="16-mixed", # 
     logger=csv_logger
     )
 trainer.fit(model, train_loader)

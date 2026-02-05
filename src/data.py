@@ -3,27 +3,44 @@ import torch
 import os
 import pandas as pd
 import json
-from torch_geometric.utils import to_undirected, subgraph
+from torch_geometric.utils import to_undirected, subgraph, k_hop_subgraph
 from torch_geometric.data import Data
 
-# disentangling load_graph and load_patients is slightly slower, but more flexible... extra fct. that does both?
-def import_patients(path, device='cpu'):
-    file_name = os.path.join(path, 'knowledge_graph_patients.pt')
-    graph = load_graph(file_name, device)
-    # represent each biological sample as set of their neighbours in KG... as pyg Data?
+def import_patients(path, num_hops=0, device='cpu', undirected=False, embedding=None, drop_labels=None, drop_unembedded=False):
+    KG, types_to_labels = import_knowledge_graph(path=path, num_hops=num_hops, undirected=undirected, embedding=embedding, drop_labels=None, drop_unembedded=False)
+    # return a set of subgraphs
+    patients = get_nodes_of_labels(KG, ['Biological Sample'], types_to_labels, device)
+    subgraphs = [extract_k_hops(KG, num_hops, center_nodes=[patient])[0] for patient in patients]   # keep mappings?
+    return subgraphs
+
+
+def extract_k_hops(graph, k, center_nodes):
+    # compute keep nodes 
+    subset, edge_index, mapping, edge_mask = k_hop_subgraph(center_nodes, k, graph.edge_index, relabel_nodes=True)
+    # or use get_subgraph logic...? This assumes exact attributes
+    subgraph = Data(
+        x=graph.x[subset],
+        edge_index=edge_index,
+        edge_labels=graph.edge_labels[edge_mask]
+        y=data.y[subset]   # keep node labels
+    )
+    return subgraph, mapping
+
     
 
 def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None, drop_labels=None, drop_unembedded=False):
     file_name = os.path.join(path, 'knowledge_graph_patients.pt')
     KG = load_graph(file_name, device)
 
+    # I NEED TO ADAPT THIS FOR WHEN DROPPING LABELS AND MAKING CONSECUTIVE AGAIN
+    types_to_labels = load_types_to_labels_map(path)    # maps numeric node_types to string node labels
     if embedding:
-        KG['x'], ids_with_embedding = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path, device=device)
+        KG.x, ids_with_embedding = load_embedding(embedding_type=embedding, num_nodes=KG.num_nodes, path=path, device=device)
         if drop_unembedded:
-            KG = filter_graph_by_nodes(KG, keep_nodes=ids_with_embedding)
+            KG = get_subgraph(KG, keep_nodes=ids_with_embedding)
             types = KG.y.unique()
-            labels = map_labels_to_types(types)
-            print(f"Found {KG.num_nodes} nodes with {embedding} embedding. Remaining node labels: {labels}")
+            labels = map_types_to_labels(types, types_to_labels)
+            print(f"Remaining node labels: {labels}")
 
     if drop_labels:
         KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path, device)
@@ -32,7 +49,8 @@ def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None,
         print("Making graph undirected")
         KG.edge_index = to_undirected(KG.edge_index)
 
-    return KG #, full_graph_ids
+    KG.y = remap_to_consecutive(KG.y)
+    return KG, types_to_labels #, full_graph_ids
 
 
 def load_graph(file_name, device='cpu'):
@@ -45,7 +63,7 @@ def load_graph(file_name, device='cpu'):
 def load_embedding(embedding_type, num_nodes, path, device='cpu'):
     assert embedding_type in ['fastrp', 'node2vec'], f"{embedding_type} is not available as node embedding"
     
-    print(f"Loading {embedding} node embeddings...")
+    print(f"Loading {embedding_type} node embeddings...")
 
     file_extension = '.parquet'
     file_name = os.path.join(path, embedding_type + file_extension)
@@ -61,22 +79,32 @@ def load_embedding(embedding_type, num_nodes, path, device='cpu'):
 
     return embedding, ids_with_embedding
 
+def get_nodes_of_labels(graph, labels, types_to_labels, device):
+    types = map_labels_to_types(labels, types_to_labels, device)
+    node_ids = (torch.isin(graph.y, types)).nonzero(as_tuple=True)[0]
+    return node_ids
+
+def keep_nodes_of_label(graph, keep_labels, path, device='cpu')::
+    print(f"Only keeping nodes of labels {keep_labels}")
+    keep_nodes = get_nodes_of_labels(graph, labels, types_to_labels, device)
+    subgraph = get_subgraph(graph, keep_nodes)
+    # if not cfg.debug:
+    #     torch.save(torch.where(keep_nodes_mask), os.path.join(path, )) ## SAVE SOMEWHERE IN RUN RESULTS...
+    return subgraph, keep_nodes
 
 ## more elegant to do this from parquet files...? Or directly when downloading? yeah, but this works for us...
-def drop_nodes_by_label(graph, drop_labels, path, device='cpu', drop_unembedded=False):
+def drop_nodes_by_label(graph, drop_labels, path, device='cpu'):
     print(f"Dropping all nodes of labels {drop_labels}")
 
     drop_types = map_labels_to_types(drop_labels, path, device)
-    keep_nodes_mask = ~(torch.isin(graph.y, drop_types))
-    subgraph = filter_graph_by_nodes(graph, keep_nodes_mask)
-    full_graph_ids = torch.nonzero(keep_nodes_mask)
+    # keep_types = Use this and get nodes of label fct.?
+    keep_nodes = ~(torch.isin(graph.y, drop_types)).nonzero(as_tuple=True)[0]
+    subgraph = get_subgraph(graph, keep_nodes)
     # if not cfg.debug:
     #     torch.save(torch.where(keep_nodes_mask), os.path.join(path, )) ## SAVE SOMEWHERE IN RUN RESULTS...
-    print(f"Remaining: {subgraph.num_nodes} nodes and {subgraph.num_edges} edges\n")
-    return subgraph, full_graph_ids
+    return subgraph, keep_nodes
 
-
-def filter_graph_by_nodes(graph, keep_nodes):
+def get_subgraph(graph, keep_nodes):
     # subgraph edges
     edge_index, edge_label, keep_edges = subgraph(
         keep_nodes, 
@@ -103,15 +131,19 @@ def filter_graph_by_nodes(graph, keep_nodes):
                 print(f"Not filtering {key}")
                 subgraph_dict[key] = value
     
-    ## adapt node labels to consecutive???
-    return Data(**subgraph_dict)    # on correct device?
+    subgraph = Data(**subgraph_dict)
+    print(f"Remaining: {subgraph.num_nodes} nodes and {subgraph.num_edges} edges\n")
+    return subgraph    # on correct device?
 
 
-def map_labels_to_types(labels, path, device):
+def load_types_to_labels_map(path): 
     # adapt to new filename, save dict other way around and saving without [\\]
     with open(os.path.join(path, 'node_labels.json')) as f:
         types_to_labels = json.load(f) 
+    return types_to_labels
 
+
+def map_labels_to_types(labels, types_to_labels, device):
     types = []
     for t, label in types_to_labels.items():
         label = eval(label)[0]  # to strip string of [\\]
@@ -122,12 +154,22 @@ def map_labels_to_types(labels, path, device):
     return torch.tensor(types).to(device=device)
 
 
-def map_types_to_labels(types, path):
-    with open(os.path.join(path, 'node_labels.json')) as f:
-        types_to_labels = json.load(f) 
+def map_types_to_labels(types, types_to_labels):
     types = types.to(device='cpu')
     labels = [types_to_labels[str(int(t))] for t in types]
-    return types_to_labels
+    return labels   #types_to_ ???
+
+
+def remap_to_consecutive(x): #, path, name
+    unique = x.unique(sorted=True)
+    if len(unique) == unique[-1] + 1:
+        # universe is already consecutive
+        return x
+
+    # torch.save # when in doubt I can just reconstruct, so dont save unique ...
+    remap = torch.empty(x.max() + 1, dtype=torch.long)
+    remap[unique] = torch.arange(len(unique), device=x.device)
+    return remap[x]
 
 
 def get_neo4j_id(ids, neo4j_ids=None, full_graph_ids=None):

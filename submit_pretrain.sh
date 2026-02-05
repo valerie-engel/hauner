@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 #SBATCH --account=core-kind     # use this account as well
-#SBATCH --gres=gpu:b200:1     # gpu:type:number a100_10gb
-#SBATCH --mem=64GB
+#SBATCH --gres=gpu:a100:2     # gpu:type:number 
+#SBATCH --mem=32GB
 #SBATCH --cpus-per-gpu=1
-#SBATCH --partition=jobs-gpu-long #testing #
+#SBATCH --partition=jobs-gpu-long #
 #SBATCH -o logs/pretrain%j.log
 #SBATCH -e logs/pretrain%j.err
 #SBATCH -J pretrain       # job name
