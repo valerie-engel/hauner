@@ -105,7 +105,7 @@ def drop_nodes_by_label(graph, drop_labels, types_to_labels, device='cpu'):
     print(f"Dropping all nodes of labels {drop_labels}")
     drop_types = map_labels_to_types(drop_labels, types_to_labels, device)
     # keep_types = Use this and get nodes of label fct.?
-    keep_nodes = ~(torch.isin(graph.y, drop_types)).nonzero(as_tuple=True)[0]
+    keep_nodes = (~torch.isin(graph.y, drop_types)).nonzero(as_tuple=True)[0]
     subgraph = get_subgraph(graph, keep_nodes)
     # if not cfg.debug:
     #     torch.save(torch.where(keep_nodes_mask), os.path.join(path, )) ## SAVE SOMEWHERE IN RUN RESULTS...
