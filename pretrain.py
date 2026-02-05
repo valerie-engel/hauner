@@ -22,6 +22,7 @@ sampled_data = next(iter(train_loader))
 # print(sampled_data)
 model = LinkPredictor(KG.num_nodes, cfg)
 # print(model(sampled_data.edge_index, sampled_data.src_index, sampled_data.dst_pos_index))
+
 csv_logger = CSVLogger("results", name="pretrain")
 trainer = Trainer(accelerator=device, max_epochs=cfg.max_epochs, logger=csv_logger)
 trainer.fit(model, train_loader)
