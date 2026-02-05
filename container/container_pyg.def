@@ -1,0 +1,63 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:24.12-py3
+
+%labels
+    Author Val
+    Version v8-B200-PygLib-Git
+
+%environment
+    export PATH=/usr/local/bin:$PATH
+    export TORCH_CUDA_ARCH_LIST="8.0 9.0"
+    export FORCE_CUDA=1
+    export CUDA_MODULE_LOADING=LAZY
+
+%post
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+
+    # 1. Install build dependencies (Added ninja-build for pyg-lib)
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        git \
+        ninja-build \
+        && rm -rf /var/lib/apt/lists/*
+
+    # 2. Build-time variables
+    export TORCH_CUDA_ARCH_LIST="8.0 9.0"
+    export FORCE_CUDA=1
+    # pyg-lib specific build flag
+    export WITH_CUDA=1
+
+    # 3. Upgrade build tools
+    pip install --upgrade pip setuptools wheel
+
+    # 4. Install PyG extensions FROM SOURCE
+    # pyg-lib must be installed from Git because it is not on PyPI
+    echo "Starting source build of PyG extensions (including pyg-lib from GitHub)..."
+    
+    # This step might take 5-10 minutes
+    pip install --no-cache-dir --no-build-isolation git+https://github.com/pyg-team/pyg-lib.git
+    
+    # These are on PyPI and will build from source automatically via --no-build-isolation
+    pip install --no-cache-dir --no-build-isolation torch-scatter
+    pip install --no-cache-dir --no-build-isolation torch-sparse
+    pip install --no-cache-dir --no-build-isolation torch-cluster
+    pip install --no-cache-dir --no-build-isolation torch-spline-conv
+    
+    # 5. Install the rest of the stack
+    pip install --no-cache-dir \
+        torch-geometric \
+        lightning \
+        numpy \
+        pandas \
+        pyyaml \
+        matplotlib
+
+    # 6. Verification
+    echo "Verifying installation..."
+    python -c "import pyg_lib; print('Success: pyg-lib installed and imported!')"
+    python -c "import torch_sparse; print('Success: torch_sparse imported!')"
+
+%runscript
+    exec "$@"

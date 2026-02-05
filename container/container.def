@@ -1,0 +1,75 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+%labels
+    Author Val
+    Version v3
+
+%environment
+    export PATH=/opt/conda/envs/hauner/bin:/opt/conda/bin:$PATH
+    export CONDA_DEFAULT_ENV=hauner
+    export LD_LIBRARY_PATH=/opt/conda/envs/hauner/lib:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+    export TORCH_CUDA_ARCH_LIST="8.0;8.6;9.0"
+
+%post
+    set -e
+
+    apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        ca-certificates \
+        git \
+        build-essential \
+        && rm -rf /var/lib/apt/lists/*
+
+    # ---- Miniconda ----
+    wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+    bash /tmp/miniconda.sh -b -p /opt/conda
+    rm /tmp/miniconda.sh
+
+    # ---- Accept Anaconda ToS (FIX FOR THE ERROR) ----
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main || true
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r || true
+
+    # ---- Conda config ----
+    /opt/conda/bin/conda config --system --remove channels defaults || true
+    /opt/conda/bin/conda config --system --add channels conda-forge
+    /opt/conda/bin/conda config --system --add channels pytorch
+    /opt/conda/bin/conda config --system --add channels nvidia
+    /opt/conda/bin/conda config --set channel_priority strict
+
+    # ---- Create env (Pinning PyTorch to 2.4.0 for torch-sparse compatibility) ----
+    /opt/conda/bin/conda create -y -n hauner python=3.10 pip
+    /opt/conda/bin/conda install -y -n hauner \
+        pytorch=2.4.0 \
+        torchvision \
+        torchaudio \
+        pytorch-cuda=12.4 \
+        -c pytorch -c nvidia
+
+    # ---- PyTorch Geometric Extensions ----
+    # Note: torch-sparse MUST match the pytorch version exactly
+    /opt/conda/bin/conda run -n hauner pip install --no-cache-dir \
+        torch-scatter \
+        torch-sparse \
+        torch-cluster \
+        torch-spline-conv \
+        -f https://data.pyg.org/whl/torch-2.4.0+cu124.html
+
+    # ---- Lightning and PyG ----
+    /opt/conda/bin/conda run -n hauner pip install --no-cache-dir \
+        torch-geometric \
+        lightning \
+        numpy \
+        pandas \
+        pyyaml \
+        matplotlib
+
+    /opt/conda/bin/conda clean -afy
+
+    # ---- Final check ----
+    /opt/conda/bin/conda run -n hauner python -c "import torch; import torch_sparse; print('Check passed: torch_sparse imported!')"
+
+%runscript
+    . /opt/conda/etc/profile.d/conda.sh
+    conda activate hauner
+    exec "$@"
