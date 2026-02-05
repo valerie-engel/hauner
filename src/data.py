@@ -84,8 +84,8 @@ def get_nodes_of_labels(graph, labels, types_to_labels, device):
     node_ids = (torch.isin(graph.y, types)).nonzero(as_tuple=True)[0]
     return node_ids
 
-def keep_nodes_of_label(graph, keep_labels, path, device='cpu')::
-    print(f"Only keeping nodes of labels {keep_labels}")
+def keep_nodes_of_label(graph, labels, path, device='cpu'):
+    print(f"Only keeping nodes of labels {labels}")
     keep_nodes = get_nodes_of_labels(graph, labels, types_to_labels, device)
     subgraph = get_subgraph(graph, keep_nodes)
     # if not cfg.debug:
