@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import torch_geometric as pyg
-from base_models import GAT
+from base_models import GAT, TypeEncoding
 
 class MaxMarginLoss(nn.Module):
     def __init__(self, margin=1):
@@ -19,7 +19,7 @@ class LinkPredictor(pl.LightningModule):
     def __init__(self, num_types, n_layers, in_channels, hidden_channels, out_channels, n_heads, dropout=0.0, residual=False, existing_embedding=None, margin=1):
         super().__init__()
         self.save_hyperparameters()
-        self.embedding = TypeEmbedder(num_types, in_channels, existing_embedding=existing_embedding)
+        self.embedding = TypeEncoding(num_types, in_channels, existing_embedding=existing_embedding)
         self.encoder = GAT(
             n_layers=n_layers, 
             in_channels=in_channels, 

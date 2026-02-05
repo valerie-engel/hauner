@@ -18,14 +18,13 @@ def extract_k_hops(graph, k, center_nodes):
     # compute keep nodes 
     subset, edge_index, mapping, edge_mask = k_hop_subgraph(center_nodes, k, graph.edge_index, relabel_nodes=True)
     # or use get_subgraph logic...? This assumes exact attributes
-    print(KG.keys())
     subgraph = Data(
         x=graph.x[subset],
         edge_index=edge_index,
-        edge_labels=graph.edge_labels[edge_mask],
-        y=graph.y[subset]   # keep node labels
+        edge_label=graph.edge_label[edge_mask],
+        y=graph.y[subset]   
     )
-    print(f"{k} hop subgraph contains {subgraph.num_nodes} nodes and {subgraph.num_edges} edges")
+    # print(f"{k} hop subgraph contains {subgraph.num_nodes} nodes and {subgraph.num_edges} edges")
     return subgraph, mapping
 
 

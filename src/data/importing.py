@@ -10,11 +10,16 @@ def import_patients(path, num_hops=0, device='cpu', undirected=False, embedding=
         embedding=embedding, 
         drop_labels=drop_labels, 
         drop_unembedded=drop_unembedded)
-    # return a set of subgraphs
+
     patients = get_nodes_of_labels(KG, ['Biological_sample'], types_to_labels, device)
-    # 0 samples because of having made consecutive!
     print(f"Found {len(patients)} biological samples")
     subgraphs = [extract_k_hops(KG, num_hops, center_nodes=[patient])[0] for patient in patients]   # keep mappings?
+    subgraph_sizes = [list(subgraph.num_nodes, subgraph.num_edges) for subgraph in subgraphs]
+    print(f"Patient subgraph sizes:")
+    node_counts = subgraph_sizes[:][0]
+    print(f"node counts:\n smallest: {min(node_counts)}, average: {sum(node_counts)/len(node_counts)}, largest: {max(node_counts)}")
+    edge_counts = subgraph_sizes[:][1]
+    print(f"edge counts:\n smallest: {min(edge_counts)}, average: {sum(edge_counts)/len(edge_counts)}, largest: {max(edge_counts)}")
     return subgraphs
 
 
