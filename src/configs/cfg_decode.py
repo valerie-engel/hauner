@@ -2,10 +2,11 @@ debug=False
 
 # data
 KG_path = 'data/knowledge_graph'
-drop_labels = ['Biological_sample', 'Subject', 'Chromosome', 'Publication', 'GWAS_study', 'Project'] #  
+drop_labels = ['Chromosome', 'Publication', 'GWAS_study', 'Project'] #  'Biological_sample', 'Subject', 
 undirected=False
 embedding='node2vec'
 drop_unembedded=True
+num_hops = 0
 
 # model 
 in_channels = 256

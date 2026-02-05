@@ -16,7 +16,7 @@ accelerator = 'gpu' if torch.cuda.is_available() else 'cpu' #, graph_device = ut
 
 patients = import_patients(
     path=cfg.KG_path, 
-    num_hops = 1,
+    num_hops = cfg.num_hops,
     device='cpu', 
     undirected=cfg.undirected, 
     embedding=cfg.embedding, 
