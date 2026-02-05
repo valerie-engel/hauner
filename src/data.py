@@ -3,13 +3,20 @@ import torch
 import os
 import pandas as pd
 import json
-from torch_geometric.utils import to_undirected, subgraph, k_hop_subgraph
+from torch_geometric.utils import to_undirected, k_hop_subgraph
+from torch_geometric.utils import subgraph as pyg_subgraph
 from torch_geometric.data import Data
 
 def import_patients(path, num_hops=0, device='cpu', undirected=False, embedding=None, drop_labels=None, drop_unembedded=False):
-    KG, types_to_labels = import_knowledge_graph(path=path, num_hops=num_hops, undirected=undirected, embedding=embedding, drop_labels=None, drop_unembedded=False)
+    KG, types_to_labels = import_knowledge_graph(
+        path=path, 
+        device=device, 
+        undirected=undirected, 
+        embedding=embedding, 
+        drop_labels=drop_labels, 
+        drop_unembedded=drop_unembedded)
     # return a set of subgraphs
-    patients = get_nodes_of_labels(KG, ['Biological Sample'], types_to_labels, device)
+    patients = get_nodes_of_labels(KG, ['Biological_sample'], types_to_labels, device)
     subgraphs = [extract_k_hops(KG, num_hops, center_nodes=[patient])[0] for patient in patients]   # keep mappings?
     return subgraphs
 
@@ -21,8 +28,8 @@ def extract_k_hops(graph, k, center_nodes):
     subgraph = Data(
         x=graph.x[subset],
         edge_index=edge_index,
-        edge_labels=graph.edge_labels[edge_mask]
-        y=data.y[subset]   # keep node labels
+        edge_labels=graph.edge_labels[edge_mask],
+        y=graph.y[subset]   # keep node labels
     )
     return subgraph, mapping
 
@@ -40,10 +47,11 @@ def import_knowledge_graph(path, device='cpu', undirected=False, embedding=None,
             KG = get_subgraph(KG, keep_nodes=ids_with_embedding)
             types = KG.y.unique()
             labels = map_types_to_labels(types, types_to_labels)
+            # THIS RETURNS DIFFERENT LABELS ON CLUSTER!!
             print(f"Remaining node labels: {labels}")
 
     if drop_labels:
-        KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, path, device)
+        KG, full_graph_ids = drop_nodes_by_label(KG, drop_labels, types_to_labels, device)
 
     if undirected:
         print("Making graph undirected")
@@ -84,7 +92,7 @@ def get_nodes_of_labels(graph, labels, types_to_labels, device):
     node_ids = (torch.isin(graph.y, types)).nonzero(as_tuple=True)[0]
     return node_ids
 
-def keep_nodes_of_label(graph, labels, path, device='cpu'):
+def keep_nodes_of_label(graph, labels, types_to_labels, device='cpu'):
     print(f"Only keeping nodes of labels {labels}")
     keep_nodes = get_nodes_of_labels(graph, labels, types_to_labels, device)
     subgraph = get_subgraph(graph, keep_nodes)
@@ -93,10 +101,9 @@ def keep_nodes_of_label(graph, labels, path, device='cpu'):
     return subgraph, keep_nodes
 
 ## more elegant to do this from parquet files...? Or directly when downloading? yeah, but this works for us...
-def drop_nodes_by_label(graph, drop_labels, path, device='cpu'):
+def drop_nodes_by_label(graph, drop_labels, types_to_labels, device='cpu'):
     print(f"Dropping all nodes of labels {drop_labels}")
-
-    drop_types = map_labels_to_types(drop_labels, path, device)
+    drop_types = map_labels_to_types(drop_labels, types_to_labels, device)
     # keep_types = Use this and get nodes of label fct.?
     keep_nodes = ~(torch.isin(graph.y, drop_types)).nonzero(as_tuple=True)[0]
     subgraph = get_subgraph(graph, keep_nodes)
@@ -106,7 +113,7 @@ def drop_nodes_by_label(graph, drop_labels, path, device='cpu'):
 
 def get_subgraph(graph, keep_nodes):
     # subgraph edges
-    edge_index, edge_label, keep_edges = subgraph(
+    edge_index, edge_label, keep_edges = pyg_subgraph(
         keep_nodes, 
         graph.edge_index, 
         edge_attr=getattr(graph, 'edge_label', None),

@@ -8,7 +8,7 @@ from pytorch_lightning.loggers import CSVLogger
 
 from data import import_knowledge_graph
 from plotting import plot_loss
-import cfg
+import configs.cfg_pretrain as cfg
 import utils
 from models.embedders import LinkPredictor
 
