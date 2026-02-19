@@ -5,7 +5,8 @@ import pytorch_lightning as pl
 from torch_geometric.nn import global_mean_pool
 from torchmetrics.classification import MulticlassAccuracy
 
-from base_models import GAT, TypeEncoding
+from .gat import GAT
+from .initial_embeddings import TypeEncoding
 
 class GraphClassifier(pl.LightningModule):
     def __init__(

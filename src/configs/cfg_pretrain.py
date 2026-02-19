@@ -2,15 +2,17 @@ debug=False
 
 # data
 KG_path = 'data/knowledge_graph'
-drop_labels = ['Subject', 'Chromosome', 'Publication', 'GWAS_study', 'Project'] # 'Biological_sample', 
+# drop_labels = ['Subject', 'Chromosome', 'Publication', 'GWAS_study', 'Project'] # 'Biological_sample', 
+select_labels = ['Disease', 'Phenotype', 'Gene', 'Protein']
+drop_selected_labels = False
 undirected=False
-embedding='node2vec'
+embedding=None
 drop_unembedded=True
 
 # model 
-in_channels = 256
-hidden_channels = 256
-out_channels = 256
+in_channels = 128
+hidden_channels = 128
+out_channels = 128
 n_layers = 3
 n_heads = 4
 dropout = 0.1
@@ -18,19 +20,21 @@ residual = False
 margin = 1
 
 # training
-batch_size = 32
+batch_size = 256
 max_epochs = 20
 num_sampled_neighbors = 10 
 # learning_rate = 1e-3
 
 # experiment management
-save_as = "GAT_from_node2vec"
+save_as = "small_GAT"
 
 if debug: 
     #data
     KG_path = 'data/knowledge_graph' #tiny_
-    drop_labels = ['Biological_sample', 'Subject', 'Chromosome', 'Publication', 'GWAS_study', 'Project'] #None # 
-    embedding='fastrp'
+    # drop_labels = ['Biological_sample', 'Subject', 'Chromosome', 'Publication', 'GWAS_study', 'Project'] #None # 
+    select_labels = ['Disease', 'Phenotype', 'Gene', 'Protein']
+    drop_selected_labels = False
+    # embedding='fastrp'
     drop_unembedded=True
 
     in_channels = 8

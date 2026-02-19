@@ -1,3 +1,7 @@
-knowledge_graph*
+data/knowledge_graph*
 __pycache__/
+logs/
+results/
 *.log
+*.err
+data/small_knowledge_graph*
